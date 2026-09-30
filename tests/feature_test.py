@@ -8,7 +8,7 @@ from mock import patch
 
 from click.testing import CliRunner
 
-from utilities_common.db import Db
+from utilities_common.db import Db, LazyDb
 from swsscommon import swsscommon
 
 import config.validated_config_db_connector as validated_config_db_connector
@@ -310,6 +310,33 @@ class TestFeature(object):
         print(result.exit_code)
         print(result.output)
         assert result.exit_code == 1
+
+    def test_nonadmin_feature_status_uses_display_helper(self, get_cmd_module):
+        (config, show) = get_cmd_module
+        helper_result = {
+            "rows": [{
+                "name": "bgp",
+                "fields": {
+                    "state": "enabled",
+                    "auto_restart": "enabled",
+                    "set_owner": "local",
+                },
+            }]
+        }
+        runner = CliRunner()
+        with mock.patch("show.feature.os.geteuid", return_value=1000), \
+                mock.patch("show.feature.display_request", return_value=helper_result) as helper, \
+                mock.patch.object(LazyDb, "_initialize", side_effect=AssertionError("direct DB access")):
+            result = runner.invoke(
+                show.cli.commands["feature"].commands["status"],
+                ["bgp"],
+                obj=LazyDb(),
+            )
+
+        assert result.exit_code == 0
+        assert "bgp" in result.output
+        assert "enabled" in result.output
+        helper.assert_called_once_with("feature_status", {"feature_name": "bgp"})
 
     def test_show_feature_autorestart(self, get_cmd_module):
         (config, show) = get_cmd_module

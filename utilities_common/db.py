@@ -42,3 +42,24 @@ class Db(object):
     def get_data(self, table, key):
         data = self.cfgdb.get_table(table)
         return data[key] if key in data else None
+
+
+class LazyDb(Db):
+    """Create the broad CLI database connection only when it is first used."""
+
+    def __init__(self):
+        self._db_initialized = False
+
+    def _initialize(self):
+        if self._db_initialized:
+            return
+        try:
+            Db.__init__(self)
+            self._db_initialized = True
+        except Exception:
+            self._db_initialized = False
+            raise
+
+    def __getattr__(self, name):
+        self._initialize()
+        return object.__getattribute__(self, name)
