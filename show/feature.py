@@ -1,9 +1,11 @@
+import os
 import sys
 import click
 from natsort import natsorted
 from tabulate import tabulate
 
 from utilities_common.cli import AbbreviationGroup, pass_db
+from redis_display.client import DisplayHelperError, request as display_request
 
 #
 # 'feature' group (show feature ...)
@@ -53,36 +55,47 @@ def feature_status(db, feature_name):
             ('RemoteState', "remote_state", "")
             ]
 
-    cfg_table = db.cfgdb.get_table('FEATURE')
-    dbconn = db.db
-    keys = dbconn.keys(dbconn.STATE_DB, "FEATURE|*")
     ordered_data = []
     fields = set()
     names = []
-    if feature_name:
-        key = "FEATURE|{}".format(feature_name)
-        if feature_name in cfg_table:
-            data = {}
-            if keys and (key in keys):
-                data = dbconn.get_all(dbconn.STATE_DB, key)
-            data.update(cfg_table[feature_name])
-            ordered_data.append(data)
-            fields = set(data.keys())
-            names.append(feature_name)
-        else:
-            click.echo("Can not find feature {}".format(feature_name))
+    if os.geteuid() != 0:
+        try:
+            result = display_request("feature_status", {"feature_name": feature_name})
+        except DisplayHelperError as exc:
+            click.echo(str(exc))
             sys.exit(1)
+        for row in result["rows"]:
+            names.append(row["name"])
+            ordered_data.append(row["fields"])
+            fields.update(row["fields"])
     else:
-        for name in natsorted(cfg_table.keys()):
-            data = {}
-            key = "FEATURE|{}".format(name)
-            if keys and (key in keys):
-                data = dbconn.get_all(dbconn.STATE_DB, key)
-            data.update(cfg_table[name])
+        cfg_table = db.cfgdb.get_table('FEATURE')
+        dbconn = db.db
+        keys = dbconn.keys(dbconn.STATE_DB, "FEATURE|*")
+        if feature_name:
+            key = "FEATURE|{}".format(feature_name)
+            if feature_name in cfg_table:
+                data = {}
+                if keys and (key in keys):
+                    data = dbconn.get_all(dbconn.STATE_DB, key)
+                data.update(cfg_table[feature_name])
+                ordered_data.append(data)
+                fields = set(data.keys())
+                names.append(feature_name)
+            else:
+                click.echo("Can not find feature {}".format(feature_name))
+                sys.exit(1)
+        else:
+            for name in natsorted(cfg_table.keys()):
+                data = {}
+                key = "FEATURE|{}".format(name)
+                if keys and (key in keys):
+                    data = dbconn.get_all(dbconn.STATE_DB, key)
+                data.update(cfg_table[name])
 
-            fields = fields | set(data.keys())
-            ordered_data.append(data)
-            names.append(name)
+                fields = fields | set(data.keys())
+                ordered_data.append(data)
+                names.append(name)
 
     header = make_header(fields_info, fields)
     body = make_body(names, ordered_data, fields, fields_info)

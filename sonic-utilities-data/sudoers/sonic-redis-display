@@ -1,0 +1,5 @@
+# Allow local users to request reviewed Redis-backed display views. The helper
+# runs as the existing redis service identity and accepts its bounded request
+# on stdin; callers cannot supply command-line arguments.
+Cmnd_Alias SONIC_REDIS_DISPLAY = /usr/local/bin/sonic-redis-display ""
+ALL ALL=(redis) NOPASSWD: SONIC_REDIS_DISPLAY
