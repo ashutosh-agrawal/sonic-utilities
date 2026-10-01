@@ -24,6 +24,7 @@ import sys
 
 from swsscommon.swsscommon import SonicV2Connector, ConfigDBConnector
 from utilities_common.cli import UserCache
+from redis_display.client import request as display_request
 
 from tabulate import tabulate
 
@@ -62,12 +63,15 @@ class AclStat(object):
         if tables:
             self.table_list = tables.split(",")
 
-        # Set up db connections
-        self.db = SonicV2Connector(use_unix_socket_path=False)
-        self.db.connect(self.db.COUNTERS_DB)
+        self.use_display_helper = os.geteuid() != 0
+        self.db = None
+        self.configdb = None
+        if not self.use_display_helper:
+            self.db = SonicV2Connector(use_unix_socket_path=False)
+            self.db.connect(self.db.COUNTERS_DB)
 
-        self.configdb = ConfigDBConnector()
-        self.configdb.connect()
+            self.configdb = ConfigDBConnector()
+            self.configdb.connect()
 
     def previous_counters(self):
         """
@@ -93,6 +97,23 @@ class AclStat(object):
         """
         read redis database for acl counters
         """
+
+        if self.use_display_helper:
+            result = display_request("acl_counters", {
+                "rules": self.rule_list,
+                "tables": self.table_list,
+            })
+            if verboseflag:
+                print("Reading ACL info...")
+                print("Total number of ACL Tables: %d" % result["total_tables"])
+                print("Total number of ACL Rules: %d" % result["total_rules"])
+                print()
+            for row in result["rows"]:
+                key = (row["table"], row["rule"])
+                self.acl_rules[key] = {"PRIORITY": row["priority"]}
+                if row["counters"]:
+                    self.acl_counters[key] = row["counters"]
+            return
 
         def get_acl_rule_counter_map():
             """

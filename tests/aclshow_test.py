@@ -319,3 +319,30 @@ def test_clear_and_populate_counters_db():
     with mock.patch('aclshow.SonicV2Connector', return_value=conn):
         test = Aclshow(nullify_on_start, nullify_on_exit, all=True, clear=False, rules=None, tables=None, verbose=None)
     assert test.result.getvalue() == all_after_clear_and_populate_output
+
+
+def test_nonadmin_uses_display_helper_without_direct_db():
+    helper_result = {
+        "total_tables": 1,
+        "total_rules": 1,
+        "rows": [{
+            "table": "DATAACL",
+            "rule": "RULE_1",
+            "priority": "9999",
+            "counters": {
+                aclshow.COUNTER_PACKETS_ATTR: "101",
+                aclshow.COUNTER_BYTES_ATTR: "100",
+            },
+        }],
+    }
+    with mock.patch.object(aclshow.os, "geteuid", return_value=1000), \
+            mock.patch.object(aclshow, "display_request", return_value=helper_result) as helper, \
+            mock.patch.object(aclshow, "SonicV2Connector", side_effect=AssertionError("direct DB access")), \
+            mock.patch.object(aclshow, "ConfigDBConnector", side_effect=AssertionError("direct DB access")):
+        test = Aclshow(all=True, clear=None, rules="RULE_1", tables="DATAACL", verbose=None)
+
+    assert "RULE_1" in test.result.getvalue()
+    helper.assert_called_once_with("acl_counters", {
+        "rules": ["RULE_1"],
+        "tables": ["DATAACL"],
+    })
