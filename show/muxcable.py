@@ -57,7 +57,7 @@ def get_asic_index_for_port(port):
     return asic_index
 
 def db_connect(db_name, namespace=EMPTY_NAMESPACE):
-    return swsscommon.DBConnector(db_name, REDIS_TIMEOUT_MSECS, True, namespace)
+    return swsscommon.DBConnector(db_name, REDIS_TIMEOUT_MSECS, False, namespace)
 
 
 def delete_all_keys_in_db_table(db_type, table_name):
