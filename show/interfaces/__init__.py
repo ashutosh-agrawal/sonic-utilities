@@ -85,7 +85,7 @@ def alias(interfacename, namespace, display):
 
     ctx = click.get_current_context()
 
-    port_dict = multi_asic.get_port_table(namespace=namespace)
+    port_dict = multi_asic.get_port_table(namespace=namespace, use_tcp=not cli_uses_unix_socket())
 
     header = ['Name', 'Alias']
     body = []
@@ -504,7 +504,7 @@ def flap(ctx, interfacename, namespace, display):
     for ns in ns_list:
         masic.current_namespace = ns
         appl_db = multi_asic.connect_to_all_dbs_for_ns(namespace=ns, use_tcp=not cli_uses_unix_socket())
-        port_dict = multi_asic.get_port_table(namespace=ns)
+        port_dict = multi_asic.get_port_table(namespace=ns, use_tcp=not cli_uses_unix_socket())
 
         # Loop through all ports or the specified port
         ports = [interfacename] if interfacename else natsorted(list(port_dict.keys()))
@@ -1349,7 +1349,7 @@ def phy_signal(db, ctx, interfacename, namespace, display, rxsig, feclock):
     if clicommon.get_interface_naming_mode() == "alias":
         display_name = clicommon.InterfaceAliasConverter().name_to_alias(interfacename)
 
-    port_dict = multi_asic.get_port_table(namespace=namespace)
+    port_dict = multi_asic.get_port_table(namespace=namespace, use_tcp=not cli_uses_unix_socket())
     if interfacename not in port_dict:
         ctx.fail("Invalid interface name {}".format(interfacename))
 
@@ -1489,7 +1489,7 @@ def phy_serdes(db, ctx, interfacename, namespace, display, snr, rxvga, txfir):
     if clicommon.get_interface_naming_mode() == "alias":
         display_name = clicommon.InterfaceAliasConverter().name_to_alias(interfacename)
 
-    port_dict = multi_asic.get_port_table(namespace=namespace)
+    port_dict = multi_asic.get_port_table(namespace=namespace, use_tcp=not cli_uses_unix_socket())
     if interfacename not in port_dict:
         ctx.fail("Invalid interface name {}".format(interfacename))
 
@@ -1538,7 +1538,7 @@ def get_ports_data():
     namespaces = multi_asic.get_namespace_list()
     for namespace in namespaces:
         db = multi_asic.connect_to_all_dbs_for_ns(namespace=namespace, use_tcp=not cli_uses_unix_socket())
-        port_table = multi_asic.get_port_table(namespace=namespace)
+        port_table = multi_asic.get_port_table(namespace=namespace, use_tcp=not cli_uses_unix_socket())
         for port_name, port_info in port_table.items():
             lanes = [lane for lane in port_info.get(LANES, "").split(',') if lane]
             oper = db.get(db.APPL_DB, f"{APPL_PORT_TABLE}:{port_name}", OPER_STATUS)
